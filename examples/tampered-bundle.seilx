@@ -1,0 +1,43 @@
+{
+  "version": "0.1.0",
+  "id": "bundle-001",
+  "created_at": "2026-05-13T10:30:00Z",
+  "decision": {
+    "type": "lending_approval",
+    "timestamp": "2026-05-13T10:30:00Z",
+    "input_hash": "sha256:abc123def456",
+    "output": {
+      "verdict": "approved",
+      "amount": 50000,
+      "currency": "SEK"
+    }
+  },
+  "evidence": {
+    "t0_state": {
+      "policy_version": "v2.1",
+      "model_version": "credit-v3",
+      "input_data": {
+        "applicant_id": "APP-12345",
+        "credit_score": 721,
+        "income_verified": true
+      }
+    },
+    "execution_trace": [
+      {
+        "step": 1,
+        "action": "input_validation",
+        "timestamp": "2026-05-13T10:30:01Z"
+      },
+      {
+        "step": 2,
+        "action": "model_inference",
+        "timestamp": "2026-05-13T10:30:02Z"
+      }
+    ],
+    "overrides": []
+  },
+  "integrity": {
+    "hash_chain": "sha256:6d17ec9b9f1c4930233a7207d5e4f85c03b54230efc1f5c568663ae2b4e09358",
+    "signature": "ecdsa:jkl345mno678"
+  }
+}

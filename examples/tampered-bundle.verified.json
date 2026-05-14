@@ -1,0 +1,19 @@
+{
+  "status": "INVALID",
+  "bundle_id": "bundle-001",
+  "timestamp": "2026-05-14T15:09:43.283163+00:00",
+  "checks": {
+    "structure": true,
+    "hashes": false,
+    "signatures": false
+  },
+  "signature_status": {
+    "verified": false,
+    "status": "PENDING",
+    "reason": "ECDSA public key not yet integrated",
+    "implementation_note": "Code structure ready \u2014 requires public key from signing party"
+  },
+  "warnings": [
+    "ECDSA public key not yet integrated"
+  ]
+}
