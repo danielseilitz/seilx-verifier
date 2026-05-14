@@ -58,18 +58,13 @@ class SeilxBundle(BaseModel):
 
 
 def compute_hash_chain(bundle: SeilxBundle) -> str:
-    """Beräknar hash-kedjan från t0_state + execution_trace."""
     hasher = hashlib.sha256()
-    
-    # Hasha t0_state
     t0_str = json.dumps({
         "policy_version": bundle.evidence.t0_state.policy_version,
         "model_version": bundle.evidence.t0_state.model_version,
         "input_data": bundle.evidence.t0_state.input_data
     }, sort_keys=True)
     hasher.update(t0_str.encode('utf-8'))
-    
-    # Hasha varje steg i execution_trace
     for step in bundle.evidence.execution_trace:
         step_str = json.dumps({
             "step": step.step,
@@ -77,8 +72,28 @@ def compute_hash_chain(bundle: SeilxBundle) -> str:
             "timestamp": step.timestamp
         }, sort_keys=True)
         hasher.update(step_str.encode('utf-8'))
-    
     return f"sha256:{hasher.hexdigest()}"
+
+
+def verify_signature(bundle: SeilxBundle) -> dict:
+    """
+    Signature verification placeholder.
+    
+    Current status: PENDING
+    Required: ECDSA public key from signing party (e.g. RTK-1)
+    Implementation: 2-3 hours once public key is available
+    
+    When implemented, this function will:
+    1. Extract public key from key registry
+    2. Verify ECDSA signature against bundle hash
+    3. Return verified: True if signature is valid
+    """
+    return {
+        "verified": False,
+        "status": "PENDING",
+        "reason": "ECDSA public key not yet integrated",
+        "implementation_note": "Code structure ready — requires public key from signing party"
+    }
 
 
 @app.command()
@@ -100,7 +115,6 @@ def verify(
         console.print(f"[bold red]ERROR:[/bold red] Invalid JSON: {e}")
         raise typer.Exit(code=1)
 
-    # Struktur-validering
     try:
         bundle = SeilxBundle(**raw_data)
         console.print("[green]✓[/green] Structure validation: [bold green]PASSED[/bold green]")
@@ -112,10 +126,8 @@ def verify(
                 console.print(f"  - {error['loc']}: {error['msg']}")
         raise typer.Exit(code=1)
 
-    # Hash-kedja
     computed = compute_hash_chain(bundle)
     stored = bundle.integrity.hash_chain
-    
     if computed == stored:
         console.print("[green]✓[/green] Hash chain verification: [bold green]PASSED[/bold green]")
         hash_ok = True
@@ -126,8 +138,11 @@ def verify(
             console.print(f"  Computed: {computed}")
         hash_ok = False
 
-    # Signatur (placeholder)
-    console.print("[yellow]○[/yellow] Signature verification: [bold yellow]PENDING[/bold yellow]")
+    sig_result = verify_signature(bundle)
+    console.print(f"[yellow]○[/yellow] Signature verification: [bold yellow]{sig_result['status']}[/bold yellow]")
+    if verbose:
+        console.print(f"  Reason: {sig_result['reason']}")
+        console.print(f"  Note: {sig_result['implementation_note']}")
 
     status = "VALID" if (structure_ok and hash_ok) else "INVALID"
 
@@ -138,9 +153,10 @@ def verify(
         "checks": {
             "structure": structure_ok,
             "hashes": hash_ok,
-            "signatures": False
+            "signatures": sig_result["verified"]
         },
-        "warnings": ["Signature verification not yet implemented"]
+        "signature_status": sig_result,
+        "warnings": [sig_result["reason"]]
     }
 
     table = Table(show_header=True, header_style="bold magenta")
@@ -148,9 +164,11 @@ def verify(
     table.add_column("Status")
     table.add_column("Details", style="white")
     table.add_row("Structure", "[green]✓ PASSED[/green]", "All required fields present")
-    table.add_row("Hash Chain", "[green]✓ PASSED[/green]" if hash_ok else "[red]✗ FAILED[/red]", 
+    table.add_row("Hash Chain",
+                  "[green]✓ PASSED[/green]" if hash_ok else "[red]✗ FAILED[/red]",
                   "Integrity verified" if hash_ok else "MANIPULATION DETECTED")
-    table.add_row("Signature", "[yellow]○ PENDING[/yellow]", "Implementation in progress")
+    table.add_row("Signature", "[yellow]○ PENDING[/yellow]",
+                  "ECDSA — public key required")
 
     console.print("\n[bold]Verification Result:[/bold]")
     console.print(table)
@@ -165,6 +183,7 @@ def verify(
 def info():
     """Show verifier information."""
     console.print("[bold blue]SEILX Verifier[/bold blue] v0.1.0")
+    console.print("Checks: structure, hash chain, signature (pending)")
 
 if __name__ == "__main__":
     app()
