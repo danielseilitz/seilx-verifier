@@ -6,13 +6,13 @@ Verifierar .seilx evidence bundles för manipulation och integritet.
 
 import typer
 import json
+import hashlib
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from rich.console import Console
 from rich.table import Table
-from pydantic import BaseModel, Field, ValidationError
-import hashlib
+from pydantic import BaseModel, ValidationError
 
 app = typer.Typer(help="SEILX Evidence Bundle Verifier")
 console = Console()
@@ -56,6 +56,31 @@ class SeilxBundle(BaseModel):
     evidence: Evidence
     integrity: Integrity
 
+
+def compute_hash_chain(bundle: SeilxBundle) -> str:
+    """Beräknar hash-kedjan från t0_state + execution_trace."""
+    hasher = hashlib.sha256()
+    
+    # Hasha t0_state
+    t0_str = json.dumps({
+        "policy_version": bundle.evidence.t0_state.policy_version,
+        "model_version": bundle.evidence.t0_state.model_version,
+        "input_data": bundle.evidence.t0_state.input_data
+    }, sort_keys=True)
+    hasher.update(t0_str.encode('utf-8'))
+    
+    # Hasha varje steg i execution_trace
+    for step in bundle.evidence.execution_trace:
+        step_str = json.dumps({
+            "step": step.step,
+            "action": step.action,
+            "timestamp": step.timestamp
+        }, sort_keys=True)
+        hasher.update(step_str.encode('utf-8'))
+    
+    return f"sha256:{hasher.hexdigest()}"
+
+
 @app.command()
 def verify(
     file: Path = typer.Argument(..., help="Path to .seilx bundle file"),
@@ -75,9 +100,11 @@ def verify(
         console.print(f"[bold red]ERROR:[/bold red] Invalid JSON: {e}")
         raise typer.Exit(code=1)
 
+    # Struktur-validering
     try:
         bundle = SeilxBundle(**raw_data)
         console.print("[green]✓[/green] Structure validation: [bold green]PASSED[/bold green]")
+        structure_ok = True
     except ValidationError as e:
         console.print(f"[bold red]✗ Structure validation: FAILED[/bold red]")
         if verbose:
@@ -85,24 +112,45 @@ def verify(
                 console.print(f"  - {error['loc']}: {error['msg']}")
         raise typer.Exit(code=1)
 
-    console.print("[yellow]○[/yellow] Hash chain verification: [bold yellow]PENDING[/bold yellow]")
+    # Hash-kedja
+    computed = compute_hash_chain(bundle)
+    stored = bundle.integrity.hash_chain
+    
+    if computed == stored:
+        console.print("[green]✓[/green] Hash chain verification: [bold green]PASSED[/bold green]")
+        hash_ok = True
+    else:
+        console.print("[red]✗[/red] Hash chain verification: [bold red]FAILED — MANIPULATION DETECTED[/bold red]")
+        if verbose:
+            console.print(f"  Stored:   {stored}")
+            console.print(f"  Computed: {computed}")
+        hash_ok = False
+
+    # Signatur (placeholder)
     console.print("[yellow]○[/yellow] Signature verification: [bold yellow]PENDING[/bold yellow]")
 
+    status = "VALID" if (structure_ok and hash_ok) else "INVALID"
+
     result = {
-        "status": "VALID",
+        "status": status,
         "bundle_id": bundle.id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "checks": {"structure": True, "hashes": False, "signatures": False},
-        "warnings": ["Hash chain verification not yet implemented", "Signature verification not yet implemented"]
+        "checks": {
+            "structure": structure_ok,
+            "hashes": hash_ok,
+            "signatures": False
+        },
+        "warnings": ["Signature verification not yet implemented"]
     }
 
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Check", style="cyan")
-    table.add_column("Status", style="green")
+    table.add_column("Status")
     table.add_column("Details", style="white")
-    table.add_row("Structure", "✓ PASSED", "All required fields present")
-    table.add_row("Hash Chain", "○ PENDING", "Implementation in progress")
-    table.add_row("Signature", "○ PENDING", "Implementation in progress")
+    table.add_row("Structure", "[green]✓ PASSED[/green]", "All required fields present")
+    table.add_row("Hash Chain", "[green]✓ PASSED[/green]" if hash_ok else "[red]✗ FAILED[/red]", 
+                  "Integrity verified" if hash_ok else "MANIPULATION DETECTED")
+    table.add_row("Signature", "[yellow]○ PENDING[/yellow]", "Implementation in progress")
 
     console.print("\n[bold]Verification Result:[/bold]")
     console.print(table)

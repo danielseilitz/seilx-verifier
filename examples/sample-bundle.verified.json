@@ -1,14 +1,13 @@
 {
   "status": "VALID",
   "bundle_id": "bundle-001",
-  "timestamp": "2026-05-14T09:18:00.009519+00:00",
+  "timestamp": "2026-05-14T09:39:54.203614+00:00",
   "checks": {
     "structure": true,
-    "hashes": false,
+    "hashes": true,
     "signatures": false
   },
   "warnings": [
-    "Hash chain verification not yet implemented",
     "Signature verification not yet implemented"
   ]
 }
