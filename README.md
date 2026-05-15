@@ -1,25 +1,53 @@
 # SEILX Verifier
 
-CLI tool for verifying .seilx evidence bundles.
+SEILX Verifier is a deterministic CLI verification utility for `.seilx` Decision Evidence Bundles.
 
-## What it does
+Verifies structural integrity, hash chain consistency, and external artifact integrity. Detects manipulation at the evidence layer.
 
-- Validates bundle structure (Pydantic)
-- Verifies hash chain (SHA-256)
-- Detects manipulation
-- Produces JSON output (.verified.json)
+## Installation
 
-## Install
-
-    pip install -r requirements.txt
+```
+pip install -r requirements.txt
+```
 
 ## Usage
 
-    python seilx_verify.py verify examples/sample-bundle.seilx
-    python seilx_verify.py verify --verbose examples/sample-bundle.seilx
+```
+py seilx_verify.py verify examples/sample-bundle.seilx
+py seilx_verify.py verify examples/tampered-bundle.seilx
+```
 
-## Status
+## Example Output
 
-- Structure validation: implemented
-- Hash chain verification: implemented
-- Signature verification: pending
+**Valid bundle:**
+```
+✓ Structure validation: PASSED
+✓ Hash chain verification: PASSED
+○ Signature verification: PENDING
+Status: VALID
+```
+
+**Tampered bundle:**
+```
+✓ Structure validation: PASSED
+✗ Hash chain verification: FAILED — MANIPULATION DETECTED
+○ Signature verification: PENDING
+Status: INVALID
+```
+
+## Verification States
+
+| State | Meaning |
+|---|---|
+| `VALID` | Bundle integrity confirmed. Hash chain verified. |
+| `INVALID` | Hash chain mismatch. Manipulation detected. |
+| `PARTIAL` | Bundle integrity OK. One or more external artifacts pending. |
+
+## Sample Bundles
+
+- `examples/sample-bundle.seilx` — Valid bundle
+- `examples/tampered-bundle.seilx` — Manipulated bundle (demonstrates detection)
+
+## Integration
+
+See `SEILX_Integration_Spec_v0.1.md` for RTK-1 alignment.
