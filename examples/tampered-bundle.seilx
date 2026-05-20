@@ -36,8 +36,8 @@
     ],
     "overrides": []
   },
-  "integrity": {
-    "hash_chain": "sha256:6d17ec9b9f1c4930233a7207d5e4f85c03b54230efc1f5c568663ae2b4e09358",
-    "signature": "ecdsa:jkl345mno678"
+ "integrity": {
+    "hash_chain": "sha256:abc123tampered",
+    "signature": "pending"
   }
 }

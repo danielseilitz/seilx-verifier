@@ -1,19 +1,18 @@
 {
   "status": "VALID",
   "bundle_id": "bundle-001",
-  "timestamp": "2026-05-14T10:36:13.428476+00:00",
+  "timestamp": "2026-05-20T06:30:44.552121+00:00",
+  "key_id": "seilx-test-2026-05",
   "checks": {
     "structure": true,
     "hashes": true,
-    "signatures": false
+    "signatures": true
   },
   "signature_status": {
-    "verified": false,
-    "status": "PENDING",
-    "reason": "ECDSA public key not yet integrated",
-    "implementation_note": "Code structure ready \u2014 requires public key from signing party"
-  },
-  "warnings": [
-    "ECDSA public key not yet integrated"
-  ]
+    "verified": true,
+    "status": "VERIFIED",
+    "key_id": "seilx-test-2026-05",
+    "reason": "Ed25519 signature valid",
+    "implementation_note": "Signature verified against seilx-test-2026-05 public key"
+  }
 }

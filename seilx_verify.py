@@ -14,8 +14,53 @@ from rich.console import Console
 from rich.table import Table
 from pydantic import BaseModel, ValidationError
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+from cryptography.hazmat.primitives import serialization
+from cryptography.exceptions import InvalidSignature
+import base64
+
 app = typer.Typer(help="SEILX Evidence Bundle Verifier")
 console = Console()
+
+KEY_DIR = Path(__file__).parent / "test_keys"
+PRIVATE_KEY_FILE = KEY_DIR / "seilx_test_private.pem"
+PUBLIC_KEY_FILE = KEY_DIR / "seilx_test_public.pem"
+KEY_ID = "seilx-test-2026-05"
+
+
+# --- Key management ---
+
+def ensure_test_keys():
+    """Generate test key pair if not present."""
+    KEY_DIR.mkdir(exist_ok=True)
+    if not PRIVATE_KEY_FILE.exists():
+        private_key = Ed25519PrivateKey.generate()
+        public_key = private_key.public_key()
+
+        PRIVATE_KEY_FILE.write_bytes(
+            private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+        )
+        PUBLIC_KEY_FILE.write_bytes(
+            public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+        )
+
+def load_public_key() -> Ed25519PublicKey:
+    ensure_test_keys()
+    return serialization.load_pem_public_key(PUBLIC_KEY_FILE.read_bytes())
+
+def load_private_key() -> Ed25519PrivateKey:
+    ensure_test_keys()
+    return serialization.load_pem_private_key(PRIVATE_KEY_FILE.read_bytes(), password=None)
+
+
+# --- Data models ---
 
 class DecisionOutput(BaseModel):
     verdict: str
@@ -57,6 +102,8 @@ class SeilxBundle(BaseModel):
     integrity: Integrity
 
 
+# --- Core functions ---
+
 def compute_hash_chain(bundle: SeilxBundle) -> str:
     hasher = hashlib.sha256()
     t0_str = json.dumps({
@@ -75,26 +122,58 @@ def compute_hash_chain(bundle: SeilxBundle) -> str:
     return f"sha256:{hasher.hexdigest()}"
 
 
-def verify_signature(bundle: SeilxBundle) -> dict:
-    """
-    Signature verification placeholder.
-    
-    Current status: PENDING
-    Required: ECDSA public key from signing party (e.g. RTK-1)
-    Implementation: 2-3 hours once public key is available
-    
-    When implemented, this function will:
-    1. Extract public key from key registry
-    2. Verify ECDSA signature against bundle hash
-    3. Return verified: True if signature is valid
-    """
-    return {
-        "verified": False,
-        "status": "PENDING",
-        "reason": "ECDSA public key not yet integrated",
-        "implementation_note": "Code structure ready — requires public key from signing party"
-    }
+def sign_bundle(hash_chain: str) -> str:
+    """Sign the hash chain with the test private key."""
+    private_key = load_private_key()
+    signature_bytes = private_key.sign(hash_chain.encode('utf-8'))
+    return base64.b64encode(signature_bytes).decode('utf-8')
 
+
+def verify_signature(bundle: SeilxBundle) -> dict:
+    """Verify ECDSA signature against bundle hash chain."""
+    sig_value = bundle.integrity.signature
+
+    # Handle legacy placeholder signatures
+    if sig_value.startswith("ecdsa:") or sig_value == "pending":
+        return {
+            "verified": False,
+            "status": "PENDING",
+            "key_id": KEY_ID,
+            "reason": "Legacy placeholder signature — re-sign bundle with: py seilx_verify.py sign <file>",
+            "implementation_note": "Run sign command to upgrade this bundle to verified status"
+        }
+
+    try:
+        public_key = load_public_key()
+        sig_bytes = base64.b64decode(sig_value)
+        hash_chain = bundle.integrity.hash_chain
+        public_key.verify(sig_bytes, hash_chain.encode('utf-8'))
+        return {
+            "verified": True,
+            "status": "VERIFIED",
+            "key_id": KEY_ID,
+            "reason": "Ed25519 signature valid",
+            "implementation_note": "Signature verified against seilx-test-2026-05 public key"
+        }
+    except InvalidSignature:
+        return {
+            "verified": False,
+            "status": "INVALID",
+            "key_id": KEY_ID,
+            "reason": "Signature verification failed — bundle may be tampered",
+            "implementation_note": "Signature does not match hash chain"
+        }
+    except Exception as e:
+        return {
+            "verified": False,
+            "status": "ERROR",
+            "key_id": KEY_ID,
+            "reason": f"Signature verification error: {e}",
+            "implementation_note": "Check key files in test_keys/"
+        }
+
+
+# --- CLI commands ---
 
 @app.command()
 def verify(
@@ -120,10 +199,10 @@ def verify(
         console.print("[green]✓[/green] Structure validation: [bold green]PASSED[/bold green]")
         structure_ok = True
     except ValidationError as e:
-        console.print(f"[bold red]✗ Structure validation: FAILED[/bold red]")
+        console.print(f"[bold red]✗[/bold red] Structure validation: FAILED[/bold red]")
         if verbose:
             for error in e.errors():
-                console.print(f"  - {error['loc']}: {error['msg']}")
+                console.print(f"  — {error['loc']}: {error['msg']}")
         raise typer.Exit(code=1)
 
     computed = compute_hash_chain(bundle)
@@ -139,10 +218,20 @@ def verify(
         hash_ok = False
 
     sig_result = verify_signature(bundle)
-    console.print(f"[yellow]○[/yellow] Signature verification: [bold yellow]{sig_result['status']}[/bold yellow]")
+    if sig_result["status"] == "VERIFIED":
+        sig_icon = "[green]✓[/green]"
+        sig_color = "green"
+    elif sig_result["status"] == "PENDING":
+        sig_icon = "[yellow]○[/yellow]"
+        sig_color = "yellow"
+    else:
+        sig_icon = "[red]✗[/red]"
+        sig_color = "red"
+
+    console.print(f"{sig_icon} Signature verification: [bold {sig_color}]{sig_result['status']}[/bold {sig_color}]")
     if verbose:
+        console.print(f"  Key ID: {sig_result.get('key_id', 'unknown')}")
         console.print(f"  Reason: {sig_result['reason']}")
-        console.print(f"  Note: {sig_result['implementation_note']}")
 
     status = "VALID" if (structure_ok and hash_ok) else "INVALID"
 
@@ -150,13 +239,13 @@ def verify(
         "status": status,
         "bundle_id": bundle.id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "key_id": sig_result.get("key_id", KEY_ID),
         "checks": {
             "structure": structure_ok,
             "hashes": hash_ok,
             "signatures": sig_result["verified"]
         },
         "signature_status": sig_result,
-        "warnings": [sig_result["reason"]]
     }
 
     table = Table(show_header=True, header_style="bold magenta")
@@ -167,8 +256,17 @@ def verify(
     table.add_row("Hash Chain",
                   "[green]✓ PASSED[/green]" if hash_ok else "[red]✗ FAILED[/red]",
                   "Integrity verified" if hash_ok else "MANIPULATION DETECTED")
-    table.add_row("Signature", "[yellow]○ PENDING[/yellow]",
-                  "ECDSA — public key required")
+    sig_status_display = sig_result["status"]
+    if sig_result["status"] == "VERIFIED":
+        sig_display = f"[green]✓ {sig_status_display}[/green]"
+        sig_detail = f"Ed25519 — key: {KEY_ID}"
+    elif sig_result["status"] == "PENDING":
+        sig_display = f"[yellow]○ {sig_status_display}[/yellow]"
+        sig_detail = "Re-sign with: py seilx_verify.py sign <file>"
+    else:
+        sig_display = f"[red]✗ {sig_status_display}[/red]"
+        sig_detail = sig_result["reason"]
+    table.add_row("Signature", sig_display, sig_detail)
 
     console.print("\n[bold]Verification Result:[/bold]")
     console.print(table)
@@ -179,11 +277,53 @@ def verify(
     output_file.write_text(json.dumps(result, indent=2), encoding='utf-8')
     console.print(f"\n[dim]Result saved to: {output_file}[/dim]")
 
+
+@app.command()
+def sign(
+    file: Path = typer.Argument(..., help="Path to .seilx bundle file to sign")
+):
+    """Sign a .seilx bundle with the test key."""
+    console.print(f"[bold blue]SEILX Signer v0.1.0[/bold blue]")
+    console.print(f"Signing bundle: {file}\n")
+
+    if not file.exists():
+        console.print(f"[bold red]ERROR:[/bold red] File not found: {file}")
+        raise typer.Exit(code=1)
+
+    try:
+        raw_data = json.loads(file.read_text(encoding='utf-8'))
+        bundle = SeilxBundle(**raw_data)
+    except Exception as e:
+        console.print(f"[bold red]ERROR:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+    computed = compute_hash_chain(bundle)
+    stored = bundle.integrity.hash_chain
+    if computed != stored:
+        console.print(f"[bold red]SIGNING REFUSED:[/bold red] Hash chain integrity check failed.")
+        console.print(f"  Stored:   {stored}")
+        console.print(f"  Computed: {computed}")
+        console.print("[bold red]This bundle has been tampered with and cannot be signed.[/bold red]")
+        raise typer.Exit(code=1)
+
+    signature = sign_bundle(computed)
+    raw_data["integrity"]["signature"] = signature
+
+    file.write_text(json.dumps(raw_data, indent=2), encoding='utf-8')
+    console.print(f"[green]✓[/green] Bundle signed with key: [bold]{KEY_ID}[/bold]")
+    console.print(f"[green]✓[/green] Hash chain: {hash_chain[:40]}...")
+    console.print(f"[green]✓[/green] Signature written to: {file}")
+
+
 @app.command()
 def info():
     """Show verifier information."""
     console.print("[bold blue]SEILX Verifier[/bold blue] v0.1.0")
-    console.print("Checks: structure, hash chain, signature (pending)")
+    console.print("Checks: structure, hash chain, signature (Ed25519)")
+    console.print(f"Key ID: {KEY_ID}")
+    ensure_test_keys()
+    console.print(f"Public key: {PUBLIC_KEY_FILE}")
+
 
 if __name__ == "__main__":
     app()
