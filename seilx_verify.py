@@ -178,6 +178,7 @@ def verify_signature(bundle: SeilxBundle) -> dict:
 @app.command()
 def verify(
     file: Path = typer.Argument(..., help="Path to .seilx bundle file"),
+    pubkey: Optional[Path] = typer.Option(None, "--pubkey", help="Path to external public key PEM file"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Detailed output")
 ):
     """Verify a .seilx evidence bundle."""
