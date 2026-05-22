@@ -16,8 +16,7 @@ from pydantic import BaseModel, ValidationError
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.exceptions import InvalidSignature
 import base64
 
@@ -32,6 +31,29 @@ KEY_ID = "seilx-test-2026-05"
 # ECDSA P-256 key files (crypto-agility)
 ECDSA_PRIVATE_KEY_FILE = KEY_DIR / "seilx_test_ecdsa_private.pem"
 ECDSA_PUBLIC_KEY_FILE = KEY_DIR / "seilx_test_ecdsa_public.pem"
+
+
+# --- Key management ---
+
+def ensure_test_keys():
+    """Generate test key pair if not present."""
+    KEY_DIR.mkdir(exist_ok=True)
+    if not PRIVATE_KEY_FILE.exists():
+        private_key = Ed25519PrivateKey.generate()
+        public_key = private_key.public_key()
+        PRIVATE_KEY_FILE.write_bytes(
+            private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+        )
+        PUBLIC_KEY_FILE.write_bytes(
+            public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+        )
 
 def ensure_ecdsa_keys():
     """Generate ECDSA P-256 test key pair if not present."""
@@ -52,6 +74,14 @@ def ensure_ecdsa_keys():
                 format=serialization.PublicFormat.SubjectPublicKeyInfo
             )
         )
+
+def load_public_key() -> Ed25519PublicKey:
+    ensure_test_keys()
+    return serialization.load_pem_public_key(PUBLIC_KEY_FILE.read_bytes())
+
+def load_private_key() -> Ed25519PrivateKey:
+    ensure_test_keys()
+    return serialization.load_pem_private_key(PRIVATE_KEY_FILE.read_bytes(), password=None)
 
 def load_ecdsa_public_key():
     ensure_ecdsa_keys()
@@ -82,38 +112,6 @@ def verify_ecdsa_signature(bundle) -> dict:
         return {"verified": False, "status": "INVALID", "reason": "ECDSA signature failed"}
     except Exception as e:
         return {"verified": False, "status": "ERROR", "reason": str(e)}
-
-
-# --- Key management ---
-
-def ensure_test_keys():
-    """Generate test key pair if not present."""
-    KEY_DIR.mkdir(exist_ok=True)
-    if not PRIVATE_KEY_FILE.exists():
-        private_key = Ed25519PrivateKey.generate()
-        public_key = private_key.public_key()
-
-        PRIVATE_KEY_FILE.write_bytes(
-            private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=serialization.NoEncryption()
-            )
-        )
-        PUBLIC_KEY_FILE.write_bytes(
-            public_key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo
-            )
-        )
-
-def load_public_key() -> Ed25519PublicKey:
-    ensure_test_keys()
-    return serialization.load_pem_public_key(PUBLIC_KEY_FILE.read_bytes())
-
-def load_private_key() -> Ed25519PrivateKey:
-    ensure_test_keys()
-    return serialization.load_pem_private_key(PRIVATE_KEY_FILE.read_bytes(), password=None)
 
 
 # --- Data models ---
@@ -187,7 +185,7 @@ def sign_bundle(hash_chain: str) -> str:
 
 
 def verify_signature(bundle: SeilxBundle) -> dict:
-    """Verify ECDSA signature against bundle hash chain."""
+    """Verify Ed25519 signature against bundle hash chain."""
     sig_value = bundle.integrity.signature
 
     # Handle legacy placeholder signatures
@@ -210,7 +208,7 @@ def verify_signature(bundle: SeilxBundle) -> dict:
             "status": "VERIFIED",
             "key_id": KEY_ID,
             "reason": "Ed25519 signature valid",
-            "implementation_note": "Signature verified against seilx-test-2026-05 public key"
+            "implementation_note": f"Signature verified against {KEY_ID} public key"
         }
     except InvalidSignature:
         return {
@@ -288,11 +286,12 @@ def verify(
     else:
         crypto_verdict = "UNVERIFIED"
     console.print(f"[bold]Crypto-Agility:[/bold] {crypto_verdict} (Ed25519: {sig_result['status']} | ECDSA P-256: {ecdsa_result['status']})")
+
     if sig_result["status"] == "VERIFIED":
         sig_icon = "[green]✓[/green]"
         sig_color = "green"
     elif sig_result["status"] == "PENDING":
-        sig_icon = "[yellow]○[/yellow]"
+        sig_icon = "[yellow]◎[/yellow]"
         sig_color = "yellow"
     else:
         sig_icon = "[red]✗[/red]"
@@ -326,15 +325,14 @@ def verify(
     table.add_row("Hash Chain",
                   "[green]✓ PASSED[/green]" if hash_ok else "[red]✗ FAILED[/red]",
                   "Integrity verified" if hash_ok else "MANIPULATION DETECTED")
-    sig_status_display = sig_result["status"]
     if sig_result["status"] == "VERIFIED":
-        sig_display = f"[green]✓ {sig_status_display}[/green]"
+        sig_display = f"[green]✓ {sig_result['status']}[/green]"
         sig_detail = f"Ed25519 — key: {KEY_ID}"
     elif sig_result["status"] == "PENDING":
-        sig_display = f"[yellow]○ {sig_status_display}[/yellow]"
+        sig_display = f"[yellow]◎ {sig_result['status']}[/yellow]"
         sig_detail = "Re-sign with: py seilx_verify.py sign <file>"
     else:
-        sig_display = f"[red]✗ {sig_status_display}[/red]"
+        sig_display = f"[red]✗ {sig_result['status']}[/red]"
         sig_detail = sig_result["reason"]
     table.add_row("Signature", sig_display, sig_detail)
 
@@ -378,18 +376,20 @@ def sign(
 
     signature = sign_bundle(computed)
     raw_data["integrity"]["signature"] = signature
+    ecdsa_sig = sign_ecdsa(computed)
+    raw_data["integrity"]["signature_ecdsa"] = ecdsa_sig
 
     file.write_text(json.dumps(raw_data, indent=2), encoding='utf-8')
     console.print(f"[green]✓[/green] Bundle signed with key: [bold]{KEY_ID}[/bold]")
-    console.print(f"[green]✓[/green] Hash chain: {hash_chain[:40]}...")
-    console.print(f"[green]✓[/green] Signature written to: {file}")
+    console.print(f"[green]✓[/green] Hash chain: {computed[:40]}...")
+    console.print(f"[green]✓[/green] Ed25519 + ECDSA P-256 signatures written to: {file}")
 
 
 @app.command()
 def info():
     """Show verifier information."""
     console.print("[bold blue]SEILX Verifier[/bold blue] v0.1.0")
-    console.print("Checks: structure, hash chain, signature (Ed25519)")
+    console.print("Checks: structure, hash chain, signature (Ed25519 + ECDSA P-256)")
     console.print(f"Key ID: {KEY_ID}")
     ensure_test_keys()
     console.print(f"Public key: {PUBLIC_KEY_FILE}")

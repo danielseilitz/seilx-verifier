@@ -38,6 +38,7 @@
   },
   "integrity": {
     "hash_chain": "sha256:6d17ec9b9f1c4930233a7207d5e4f85c03b54230efc1f5c568663ae2b4e09358",
-    "signature": "2wvcY9dpbT8AW0oIeLe1zkPuXM6h7DLDE6sFWoP9UiWaZ8k0yp8eVIrbtF9Hpz964vawh22weETyWYWJ8D5SAw=="
+    "signature": "2wvcY9dpbT8AW0oIeLe1zkPuXM6h7DLDE6sFWoP9UiWaZ8k0yp8eVIrbtF9Hpz964vawh22weETyWYWJ8D5SAw==",
+    "signature_ecdsa": "MEUCIQCTH+6JO42y9cMU39dQlEEsCmLIx9Z5gVeO0LYasLJDtgIgEBb/i86WouxwXWPdAEENRRtM4t9iJl05T8roxGt2Bvc="
   }
 }
