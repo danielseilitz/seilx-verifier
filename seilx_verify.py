@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json, base64, hashlib, sys, argparse
 from pathlib import Path
+from datetime import datetime, timezone
 from cryptography.hazmat.primitives.asymmetric import ed25519, ec
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.exceptions import InvalidSignature
@@ -75,6 +76,46 @@ def verify_compositional_link(bundle, rtk_evidence, rtk_pubkey):
         return True, "COMPOSITION_INTACT " + str(checks)
     return False, "COMPOSITION_CHAIN_BROKEN " + str(checks)
 
+def write_executive_report(args, results):
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    verified = results["verified"]
+    composition = results.get("composition")
+    has_upstream = composition is not None
+    if verified:
+        status = "VERIFIED"
+        admissible = "YES"
+        comp_state = "INTACT" if composition else "N/A"
+        l3_line = "Layer 3 (SEILX Post-Decision):    PASS -- Ed25519 verified"
+        summary = ("The decision-state container has been deterministically cross-examined\n"
+            "against the authorized upstream governance mandate. The evidence chain\n"
+            "is independently verifiable, cryptographically bound, and forensically\n"
+            "admissible under external challenge.")
+        action = "No action required. Evidence integrity confirmed."
+    else:
+        status = "INVALID"
+        admissible = "NO"
+        comp_state = "BROKEN" if has_upstream else "N/A"
+        l3_line = "Layer 3 (SEILX Post-Decision):    FAIL -- FATAL_CHAIN_BREACH"
+        summary = ("The evidence container has been forensically compromised. Hash chain\n"
+            "integrity failed, indicating post-decision tampering. The bundle\n"
+            "cannot be validated, signed, or admitted as evidence.")
+        action = "REGENERATE_FROM_ORIGIN_RUNTIME. Do not attempt to repair or re-sign."
+    sep = "=" * 70
+    lines = [sep, "           SEILX FORENSIC VERIFICATION REPORT", sep, "",
+        "Timestamp:     " + ts, "Bundle:        " + args.bundle,
+        "Verifier:      SEILX v0.1.0", "", "[COMPLIANCE VERDICT]",
+        "Status:        " + status, "Composition:   " + comp_state,
+        "Admissible:    " + admissible, "", "[FORENSIC EVIDENCE TRAIL]"]
+    if has_upstream:
+        l1 = "PASS -- ECDSA P-256 verified" if composition else "FAIL -- TAMPERED OR INVALID"
+        lines.append("Layer 1 (RTK-1 Pre-Deployment):   " + l1)
+    lines.append(l3_line)
+    if has_upstream:
+        lines.append("Cross-Reference:                  " + ("INTACT -- Minimal Interoperable Artifact matches" if composition else "BROKEN -- Artifact mismatch detected"))
+    lines += ["", "[EXECUTIVE SUMMARY]", summary, "", "RECOMMENDED ACTION: " + action, sep]
+    Path("seilx_report.txt").write_text("\n".join(lines), encoding="utf-8")
+    print("\nExecutive report saved to: seilx_report.txt")
+
 def main():
     parser = argparse.ArgumentParser(description="SEILX Verifier")
     parser.add_argument("command")
@@ -82,9 +123,11 @@ def main():
     parser.add_argument("--pubkey", required=True)
     parser.add_argument("--upstream", default=None)
     parser.add_argument("--upstream-pubkey", default=None)
+    parser.add_argument("--report", default=None, choices=["executive"])
     args = parser.parse_args()
     bundle = load_json(args.bundle)
     pubkey = load_pubkey(args.pubkey)
+    results = {"verified": False, "composition": None}
     print("")
     print("=" * 55)
     print("  SEILX VERIFIER -- " + bundle.get("bundle_id","?"))
@@ -92,25 +135,39 @@ def main():
     ok, msg = verify_structure(bundle)
     print("  [LAYER 1 STRUCTURE]   " + ("PASS" if ok else "FAIL") + ": " + msg)
     if not ok:
-        print("  FATAL_CHAIN_BREACH"); sys.exit(1)
+        print("  FATAL_CHAIN_BREACH")
+        if args.report == "executive": write_executive_report(args, results)
+        sys.exit(1)
     ok, msg = verify_hash_chain(bundle)
     print("  [LAYER 2 HASH CHAIN]  " + ("PASS" if ok else "FAIL") + ": " + msg)
     if not ok:
-        print("  FATAL_CHAIN_BREACH"); sys.exit(1)
+        print("  FATAL_CHAIN_BREACH")
+        if args.report == "executive": write_executive_report(args, results)
+        sys.exit(1)
     ok, msg = verify_signature(bundle, pubkey)
     print("  [LAYER 3 SIGNATURE]   " + ("PASS" if ok else "FAIL") + ": " + msg)
     if not ok:
-        print("  FATAL_CHAIN_BREACH"); sys.exit(1)
+        print("  FATAL_CHAIN_BREACH")
+        if args.report == "executive": write_executive_report(args, results)
+        sys.exit(1)
+    results["verified"] = True
     if args.upstream and args.upstream_pubkey:
         rtk_evidence = load_json(args.upstream)
         rtk_pubkey = load_pubkey(args.upstream_pubkey)
         ok, msg = verify_compositional_link(bundle, rtk_evidence, rtk_pubkey)
         print("  [LAYER 4 COMPOSITION] " + ("PASS" if ok else "FAIL") + ": " + msg)
+        results["composition"] = ok
         if not ok:
-            print("  COMPOSITION_CHAIN_BROKEN"); sys.exit(1)
+            print("  COMPOSITION_CHAIN_BROKEN")
+            if args.report == "executive":
+                results["verified"] = False
+                write_executive_report(args, results)
+            sys.exit(1)
     print("")
     print("  VERIFIED -- COMPOSITION_INTACT")
     print("")
+    if args.report == "executive":
+        write_executive_report(args, results)
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,26 @@
+======================================================================
+           SEILX FORENSIC VERIFICATION REPORT
+======================================================================
+
+Timestamp:     2026-05-27T09:43:37Z
+Bundle:        examples/seilx-bundle-with-upstream.seilx
+Verifier:      SEILX v0.1.0
+
+[COMPLIANCE VERDICT]
+Status:        VERIFIED
+Composition:   INTACT
+Admissible:    YES
+
+[FORENSIC EVIDENCE TRAIL]
+Layer 1 (RTK-1 Pre-Deployment):   PASS -- ECDSA P-256 verified
+Layer 3 (SEILX Post-Decision):    PASS -- Ed25519 verified
+Cross-Reference:                  INTACT -- Minimal Interoperable Artifact matches
+
+[EXECUTIVE SUMMARY]
+The decision-state container has been deterministically cross-examined
+against the authorized upstream governance mandate. The evidence chain
+is independently verifiable, cryptographically bound, and forensically
+admissible under external challenge.
+
+RECOMMENDED ACTION: No action required. Evidence integrity confirmed.
+======================================================================
