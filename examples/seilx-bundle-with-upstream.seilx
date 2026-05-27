@@ -1,0 +1,54 @@
+{
+  "bundle_id": "bundle-002",
+  "timestamp": "2026-05-27T10:00:00+00:00",
+  "decision_state": {
+    "input": "user_query_001",
+    "model": "gpt-4o",
+    "output": "approved",
+    "confidence": 0.94
+  },
+  "external_verdicts": [
+    {
+      "layer": 1,
+      "source": "RTK-1",
+      "minimal_interoperable_artifact": {
+        "verdict_value": "C1",
+        "canonical_hash": "sha256:5bb9378f794e83e24e17039673af1137efc2b33fbeaaf9c52b7dfd81780e1c1a",
+        "reference_uri": "https://rtksecuritylabs.com/evidence/rtk-evidence-001.json",
+        "signing_key": {
+          "key_id": "rtk-key-2026-01",
+          "public_key_url": "https://rtksecuritylabs.com/keys/rtk-key-2026-01.pem"
+        },
+        "version_pinning": {
+          "evidence_version": "rtk-1.0.0",
+          "producer_version": "rtk-security-labs-2026-01"
+        },
+        "validation_scope": "pre_deployment_safety_case",
+        "freshness_window": "2026-05-27T09:00:00+00:00/2026-06-03T09:00:00+00:00"
+      }
+    }
+  ],
+  "hash_chain": [
+    {
+      "block": 0,
+      "label": "decision_state",
+      "hash": "sha256:86735417f69255d5c8307a641be42ced1254ff90bca5f9b42579df9edf3c8d5b"
+    },
+    {
+      "block": 1,
+      "label": "external_verdicts",
+      "hash": "sha256:74856122f9d5ca5ed8044c2b3184e41969bd28cff89ac4aa6381f0778d07a353"
+    },
+    {
+      "block": 2,
+      "label": "chain_root",
+      "hash": "sha256:121bbe4ae14735a407e68887523e9b39cdba33ab9a47f3aa30140ad17201af70"
+    }
+  ],
+  "signature": {
+    "algorithm": "Ed25519",
+    "key_id": "seilx-test-2026-05",
+    "signed_value": "sha256:121bbe4ae14735a407e68887523e9b39cdba33ab9a47f3aa30140ad17201af70",
+    "value": "v4TPg/bIxNBtrS+bIMl+R+38xj8xKz24Lr/NqAela++ZQQc43HTC7SC9e2QH5OM6TdZklajiT97D7SqYhmxfDg=="
+  }
+}

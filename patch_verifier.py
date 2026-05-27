@@ -1,12 +1,13 @@
-# -*- coding: utf-8 -*-
-import json, base64, hashlib, sys, argparse
+import pathlib
+
+CODE = """import json, base64, hashlib, sys, argparse
 from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric import ed25519, ec
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.exceptions import InvalidSignature
 
 def load_json(path):
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    return json.loads(Path(path).read_text())
 
 def load_pubkey(path):
     return serialization.load_pem_public_key(Path(path).read_bytes())
@@ -65,12 +66,7 @@ def verify_compositional_link(bundle, rtk_evidence, rtk_pubkey):
     hash_match = mia["canonical_hash"] == rtk_evidence["canonical_hash"] == expected_hash
     verdict_match = mia["verdict_value"] == canonical_json["verdict"]
     key_id_match = mia["signing_key"]["key_id"] == rtk_evidence["signature"]["key_id"]
-    checks = {
-        "verdict_match": verdict_match,
-        "hash_match": hash_match,
-        "key_id_match": key_id_match,
-        "rtk_sig_valid": sig_valid
-    }
+    checks = {"verdict_match": verdict_match, "hash_match": hash_match, "key_id_match": key_id_match, "rtk_sig_valid": sig_valid}
     if all(checks.values()):
         return True, "COMPOSITION_INTACT " + str(checks)
     return False, "COMPOSITION_CHAIN_BROKEN " + str(checks)
@@ -114,3 +110,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+"""
+
+pathlib.Path("seilx_verify.py").write_text(CODE, encoding="utf-8")
+print("seilx_verify.py overwritten successfully")
