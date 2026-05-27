@@ -2,25 +2,22 @@
            SEILX FORENSIC VERIFICATION REPORT
 ======================================================================
 
-Timestamp:     2026-05-27T09:43:37Z
-Bundle:        examples/seilx-bundle-with-upstream.seilx
+Timestamp:     2026-05-27T10:43:37Z
+Bundle:        examples/tampered-bundle.seilx
 Verifier:      SEILX v0.1.0
 
 [COMPLIANCE VERDICT]
-Status:        VERIFIED
-Composition:   INTACT
-Admissible:    YES
+Status:        INVALID
+Composition:   N/A
+Admissible:    NO
 
 [FORENSIC EVIDENCE TRAIL]
-Layer 1 (RTK-1 Pre-Deployment):   PASS -- ECDSA P-256 verified
-Layer 3 (SEILX Post-Decision):    PASS -- Ed25519 verified
-Cross-Reference:                  INTACT -- Minimal Interoperable Artifact matches
+Layer 3 (SEILX Post-Decision):    FAIL -- FATAL_CHAIN_BREACH
 
 [EXECUTIVE SUMMARY]
-The decision-state container has been deterministically cross-examined
-against the authorized upstream governance mandate. The evidence chain
-is independently verifiable, cryptographically bound, and forensically
-admissible under external challenge.
+The evidence container has been forensically compromised. Hash chain
+integrity failed, indicating post-decision tampering. The bundle
+cannot be validated, signed, or admitted as evidence.
 
-RECOMMENDED ACTION: No action required. Evidence integrity confirmed.
+RECOMMENDED ACTION: REGENERATE_FROM_ORIGIN_RUNTIME. Do not attempt to repair or re-sign.
 ======================================================================
