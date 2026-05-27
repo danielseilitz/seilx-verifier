@@ -1,53 +1,108 @@
 # SEILX Verifier
 
-SEILX Verifier is a deterministic CLI verification utility for `.seilx` Decision Evidence Bundles.
+Cryptographic evidence integrity verifier for AI decision-state bundles.
+Detects post-decision tampering via a multi-layer hash chain and signature verification.
+Supports compositional verification across sovereign governance layers (Layer 1 × Layer 3).
 
-Verifies structural integrity, hash chain consistency, and external artifact integrity. Detects manipulation at the evidence layer.
+Designed for independent verification under external challenge.
+
+## Architecture
+
+```
+Layer 1  RTK-1 Pre-Deployment Testing    ECDSA P-256
+         adversarial red-team evidence
+              |
+              | Minimal Interoperable Artifact (7 fields, Art. 1.3)
+              |
+Layer 3  SEILX Post-Decision Integrity   Ed25519
+         decision-state bundle
+```
+
+Manipulation at any layer produces an irreversible FATAL_CHAIN_BREACH.
+A compromised bundle cannot be re-signed or repaired.
 
 ## Installation
 
-```
-pip install -r requirements.txt
+```bash
+pip install cryptography
+git clone https://github.com/danielseilitz/seilx-verifier
+cd seilx-verifier
 ```
 
 ## Usage
 
-```
-py seilx_verify.py verify examples/sample-bundle.seilx
-py seilx_verify.py verify examples/tampered-bundle.seilx
+### Standalone Verification
+
+```bash
+py seilx_verify.py verify examples/sample-bundle.seilx --pubkey test_keys/seilx_test_public.pem
 ```
 
-## Example Output
+### Compositional Verification (RTK-1 x SEILX)
+
+```bash
+py seilx_verify.py verify examples/seilx-bundle-with-upstream.seilx --pubkey test_keys/seilx_test_public.pem --upstream examples/rtk-evidence-mock.json --upstream-pubkey test_keys/rtk_mock_public.pem
+```
+
+### Executive Report Output
+
+```bash
+py seilx_verify.py verify examples/seilx-bundle-with-upstream.seilx --pubkey test_keys/seilx_test_public.pem --upstream examples/rtk-evidence-mock.json --upstream-pubkey test_keys/rtk_mock_public.pem --report executive
+```
+
+Writes `seilx_report.txt` — readable by CISO, Legal, or external auditor.
+
+## Expected Output
 
 **Valid bundle:**
 ```
-✓ Structure validation: PASSED
-✓ Hash chain verification: PASSED
-○ Signature verification: PENDING
-Status: VALID
+=======================================================
+  SEILX VERIFIER -- bundle-002
+=======================================================
+  [LAYER 1 STRUCTURE]   PASS: OK
+  [LAYER 2 HASH CHAIN]  PASS: OK
+  [LAYER 3 SIGNATURE]   PASS: OK
+  [LAYER 4 COMPOSITION] PASS: COMPOSITION_INTACT
+
+  VERIFIED -- COMPOSITION_INTACT
 ```
 
 **Tampered bundle:**
 ```
-✓ Structure validation: PASSED
-✗ Hash chain verification: FAILED — MANIPULATION DETECTED
-○ Signature verification: PENDING
-Status: INVALID
+  [LAYER 2 HASH CHAIN]  FAIL: Block 0 mismatch
+  FATAL_CHAIN_BREACH
 ```
 
-## Verification States
+**Tampered upstream (RTK-1):**
+```
+  [LAYER 4 COMPOSITION] FAIL: COMPOSITION_CHAIN_BROKEN
+  {'verdict_match': False, 'hash_match': False, 'rtk_sig_valid': False}
+```
 
-| State | Meaning |
-|---|---|
-| `VALID` | Bundle integrity confirmed. Hash chain verified. |
-| `INVALID` | Hash chain mismatch. Manipulation detected. |
-| `PARTIAL` | Bundle integrity OK. One or more external artifacts pending. |
+## Test Scenarios
 
-## Sample Bundles
+| Scenario | Command | Expected |
+|---|---|---|
+| Clean chain | `verify seilx-bundle-with-upstream.seilx --upstream rtk-evidence-mock.json` | COMPOSITION_INTACT |
+| Tampered SEILX bundle | modify `decision_state`, re-run verify | FATAL_CHAIN_BREACH |
+| Tampered RTK-1 upstream | modify `canonical_json` verdict, re-run verify | COMPOSITION_CHAIN_BROKEN |
 
-- `examples/sample-bundle.seilx` — Valid bundle
-- `examples/tampered-bundle.seilx` — Manipulated bundle (demonstrates detection)
+## Mock Evidence
 
-## Integration
+- `examples/rtk-evidence-mock.json` — RTK-1 compatible evidence object (ECDSA P-256, mock key)
+- `examples/seilx-bundle-with-upstream.seilx` — SEILX bundle with upstream reference (Ed25519)
+- `test_keys/rtk_mock_public.pem` — Mock RTK-1 public key
+- `test_keys/seilx_test_public.pem` — SEILX test public key
 
-See `SEILX_Integration_Spec_v0.1.md` for RTK-1 alignment.
+All mock files are clearly labelled. Do not use mock keys in production.
+
+## Compliance Mappings
+
+RTK-1 evidence objects support the following compliance frameworks:
+- EU AI Act Art. 9, 14, 15
+- NIST AI RMF GOVERN
+- OWASP LLM01
+
+## Contract Reference
+
+Compositional verification implements the Minimal Interoperable Artifact specification
+per RTK-SEILX Bilateral Agreement Art. 1.3 and Art. 3.1.
