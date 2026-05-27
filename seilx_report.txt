@@ -2,17 +2,19 @@
            SEILX FORENSIC VERIFICATION REPORT
 ======================================================================
 
-Timestamp:     2026-05-27T10:43:37Z
-Bundle:        examples/tampered-bundle.seilx
+Timestamp:     2026-05-27T11:11:37Z
+Bundle:        examples/seilx-bundle-with-upstream.seilx
 Verifier:      SEILX v0.1.0
 
 [COMPLIANCE VERDICT]
 Status:        INVALID
-Composition:   N/A
+Composition:   BROKEN
 Admissible:    NO
 
 [FORENSIC EVIDENCE TRAIL]
+Layer 1 (RTK-1 Pre-Deployment):   FAIL -- TAMPERED OR INVALID
 Layer 3 (SEILX Post-Decision):    FAIL -- FATAL_CHAIN_BREACH
+Cross-Reference:                  BROKEN -- Artifact mismatch detected
 
 [EXECUTIVE SUMMARY]
 The evidence container has been forensically compromised. Hash chain
