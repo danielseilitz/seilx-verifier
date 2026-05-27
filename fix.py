@@ -194,7 +194,7 @@ def verify_signature(bundle: SeilxBundle) -> dict:
             "verified": False,
             "status": "FATAL_CHAIN_BREACH",
             "key_id": KEY_ID,
-            "reason": "Bundle is forensically compromised — tamper detected in hash chain",
+            "reason": "Legacy placeholder signature — re-sign bundle with: py seilx_verify.py sign <file>",
             "recoverable": False, "required_action": "REGENERATE_FROM_ORIGIN_RUNTIME"
         }
 

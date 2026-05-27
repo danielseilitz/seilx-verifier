@@ -1,7 +1,7 @@
 {
   "status": "INVALID",
   "bundle_id": "bundle-001",
-  "timestamp": "2026-05-26T19:55:26.273644+00:00",
+  "timestamp": "2026-05-27T07:46:35.424061+00:00",
   "key_id": "seilx-test-2026-05",
   "checks": {
     "structure": true,
@@ -10,9 +10,10 @@
   },
   "signature_status": {
     "verified": false,
-    "status": "PENDING",
+    "status": "FATAL_CHAIN_BREACH",
     "key_id": "seilx-test-2026-05",
-    "reason": "Legacy placeholder signature \u2014 re-sign bundle with: py seilx_verify.py sign <file>",
-    "implementation_note": "Run sign command to upgrade this bundle to verified status"
+    "reason": "Bundle is forensically compromised \u2014 tamper detected in hash chain",
+    "recoverable": false,
+    "required_action": "REGENERATE_FROM_ORIGIN_RUNTIME"
   }
 }
