@@ -12,6 +12,9 @@ def load_json(path):
 def load_pubkey(path):
     return serialization.load_pem_public_key(Path(path).read_bytes())
 
+def load_privkey(path):
+    return serialization.load_pem_private_key(Path(path).read_bytes(), password=None)
+
 def verify_structure(bundle):
     required = ["bundle_id","timestamp","decision_state","hash_chain","signature"]
     missing = [f for f in required if f not in bundle]
@@ -47,6 +50,16 @@ def verify_signature(bundle, pubkey):
         return True, "OK"
     except InvalidSignature:
         return False, "INVALID SIGNATURE"
+
+def sign_bundle(bundle, privkey):
+    sig = bundle.get("signature", {})
+    if sig.get("value"):
+        return False, "SIGNING_REFUSED -- Decision state locked at T0. No post-hoc modification permitted."
+    chain = bundle["hash_chain"]
+    top_hash = chain[-1]["hash"].encode()
+    sig_bytes = privkey.sign(top_hash, ec.ECDSA(hashes.SHA256()))
+    bundle["signature"]["value"] = base64.b64encode(sig_bytes).decode()
+    return True, "SIGNED -- Bundle sealed at T0."
 
 def verify_compositional_link(bundle, rtk_evidence, rtk_pubkey):
     verdicts = bundle.get("external_verdicts", [])
@@ -118,13 +131,41 @@ def write_executive_report(args, results):
 
 def main():
     parser = argparse.ArgumentParser(description="SEILX Verifier")
-    parser.add_argument("command")
-    parser.add_argument("bundle")
-    parser.add_argument("--pubkey", required=True)
-    parser.add_argument("--upstream", default=None)
-    parser.add_argument("--upstream-pubkey", default=None)
-    parser.add_argument("--report", default=None, choices=["executive"])
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # verify subcommand
+    vp = subparsers.add_parser("verify")
+    vp.add_argument("bundle")
+    vp.add_argument("--pubkey", required=True)
+    vp.add_argument("--upstream", default=None)
+    vp.add_argument("--upstream-pubkey", default=None)
+    vp.add_argument("--report", default=None, choices=["executive"])
+
+    # sign subcommand
+    sp = subparsers.add_parser("sign")
+    sp.add_argument("bundle")
+    sp.add_argument("--privkey", required=True)
+    sp.add_argument("--out", default=None)
+
     args = parser.parse_args()
+
+    if args.command == "sign":
+        bundle = load_json(args.bundle)
+        privkey = load_privkey(args.privkey)
+        print("")
+        print("=" * 55)
+        print("  SEILX SIGNER -- " + bundle.get("bundle_id","?"))
+        print("=" * 55)
+        ok, msg = sign_bundle(bundle, privkey)
+        print("  " + msg)
+        if ok:
+            out_path = args.out or args.bundle.replace(".seilx", "-signed.seilx")
+            Path(out_path).write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+            print("  Saved: " + out_path)
+        print("")
+        return
+
+    # verify flödet
     bundle = load_json(args.bundle)
     pubkey = load_pubkey(args.pubkey)
     results = {"verified": False, "composition": None}
